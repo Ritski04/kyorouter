@@ -123,7 +123,7 @@ export default function Sidebar({ onClose }) {
         {/* Logo */}
         <div className="px-6 py-4 flex flex-col gap-2">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="flex items-center justify-center size-9 rounded-[10px] overflow-hidden">
+            <div className="flex items-center justify-center size-9 rounded-[10px] bg-gradient-to-br from-brand-500 to-brand-700 shadow-[var(--shadow-warm)] p-1.5">
               <img src="/logo.svg" alt="KyoRouter Logo" className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
