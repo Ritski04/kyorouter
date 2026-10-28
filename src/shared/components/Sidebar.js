@@ -61,13 +61,14 @@ export default function Sidebar({ onClose }) {
 
   // Lazy check for new npm version in background after initial render
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetch("/api/version")
-        .then(res => res.json())
-        .then(data => { if (data.hasUpdate) setUpdateInfo(data); })
-        .catch(() => {});
-    }, 2500);
-    return () => clearTimeout(timer);
+    // Disabled: kyorouter not yet published to npm
+    // const timer = setTimeout(() => {
+    //   fetch("/api/version")
+    //     .then(res => res.json())
+    //     .then(data => { if (data.hasUpdate) setUpdateInfo(data); })
+    //     .catch(() => {});
+    // }, 2500);
+    // return () => clearTimeout(timer);
   }, []);
 
   const isActive = (href) => {
