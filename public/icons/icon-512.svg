@@ -10,7 +10,7 @@
     <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
   </linearGradient>
 </defs>
-<rect width="1000" height="1000" fill="url(#bgGradient)" rx="100"/>
+<rect width="1000" height="1000" fill="url(#bgGradient)" rx="150"/>
 <g transform="matrix(1.9431 0.1488 -0.1488 1.9431 461.1685 285.6381)"  >
 <linearGradient id="SVGID_569" gradientUnits="userSpaceOnUse" gradientTransform="matrix(1 0 0 1 -27.9808 0)"  x1="419" y1="490" x2="559" y2="293">
 <stop offset="0%" style="stop-color:#ffffff;stop-opacity: 1"/>
