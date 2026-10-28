@@ -1,4 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#0a0a0a"/>
-  <text x="256" y="320" font-family="Arial, sans-serif" font-size="200" font-weight="bold" fill="#ffffff" text-anchor="middle">9R</text>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="kyoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A9EFF;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#6B7FFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B7FFF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Dark background -->
+  <rect width="512" height="512" fill="#0B0E13"/>
+  
+  <!-- K Letter - Left vertical -->
+  <rect x="140" y="140" width="32" height="232" fill="none" stroke="url(#kyoGradient)" stroke-width="6" rx="2"/>
+  
+  <!-- K Letter - Upper diagonal -->
+  <line x1="172" y1="256" x2="320" y2="140" stroke="url(#kyoGradient)" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- K Letter - Lower diagonal -->
+  <line x1="172" y1="256" x2="320" y2="372" stroke="url(#kyoGradient)" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Circuit arrows - Top right -->
+  <g stroke="url(#kyoGradient)" stroke-width="4" fill="none">
+    <!-- Arrow up -->
+    <line x1="340" y1="180" x2="340" y2="120"/>
+    <polyline points="330,130 340,120 350,130" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Arrow right -->
+    <line x1="340" y1="200" x2="400" y2="200"/>
+    <polyline points="390,190 400,200 390,210" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Circuit nodes -->
+    <circle cx="340" cy="180" r="4" fill="#4A9EFF"/>
+    <circle cx="340" cy="200" r="4" fill="#6B7FFF"/>
+  </g>
+  
+  <!-- Circuit traces - Bottom right -->
+  <g stroke="url(#kyoGradient)" stroke-width="3" fill="none">
+    <!-- Horizontal trace -->
+    <line x1="340" y1="340" x2="390" y2="340"/>
+    <circle cx="340" cy="340" r="3" fill="#8B7FFF"/>
+    <circle cx="365" cy="340" r="3" fill="#8B7FFF"/>
+    <circle cx="390" cy="340" r="3" fill="#8B7FFF"/>
+    
+    <!-- Arrow down -->
+    <line x1="340" y1="360" x2="340" y2="400"/>
+    <polyline points="330,390 340,400 350,390" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
