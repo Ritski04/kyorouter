@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Provider Tokens</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      padding: 24px;
+      line-height: 1.6;
+    }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 8px; color: #fff; }
+    .subtitle { color: #888; font-size: 14px; margin-bottom: 24px; }
+    
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .card-label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-value { font-size: 32px; font-weight: 600; color: #fff; margin-top: 8px; }
+    .card-sub { font-size: 13px; color: #aaa; margin-top: 4px; }
+    
+    .provider-section {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .provider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .provider-title { font-size: 20px; font-weight: 600; color: #fff; }
+    .provider-meta { font-size: 13px; color: #888; }
+    .provider-stats {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+    .stat-item { text-align: right; }
+    .stat-label { font-size: 11px; color: #888; text-transform: uppercase; }
+    .stat-value { font-size: 24px; font-weight: 600; color: #4ade80; margin-top: 4px; }
+    
+    .keys-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+    .keys-table th {
+      text-align: left;
+      padding: 12px;
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #2a2a2a;
+      font-weight: 500;
+    }
+    .keys-table td {
+      padding: 16px 12px;
+      border-bottom: 1px solid #1a1a1a;
+      font-size: 14px;
+    }
+    .keys-table tr:hover { background: #151515; }
+    
+    .key-name { font-weight: 500; color: #fff; }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .status-active { background: #16a34a22; color: #4ade80; }
+    .status-error { background: #dc262622; color: #f87171; }
+    .status-unknown { background: #71717122; color: #a1a1a1; }
+    
+    .quota-bar {
+      width: 100%;
+      height: 6px;
+      background: #2a2a2a;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .quota-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+    .quota-ok { background: #4ade80; }
+    .quota-warn { background: #facc15; }
+    .quota-critical { background: #f87171; }
+    
+    .probe-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-weight: 500;
+    }
+    .probe-btn:hover { background: #1d4ed8; }
+    .probe-btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+    
+    .quota-info {
+      font-size: 13px;
+      color: #aaa;
+      margin-top: 4px;
+    }
+    .quota-loading { color: #888; font-style: italic; }
+    .quota-error { color: #f87171; }
+    .quota-success { color: #4ade80; }
+    
+    .loading {
+      text-align: center;
+      padding: 60px;
+      color: #888;
+      font-size: 16px;
+    }
+    .error {
+      background: #dc262622;
+      border: 1px solid #dc2626;
+      color: #f87171;
+      padding: 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    
+    .refresh-btn {
+      background: #374151;
+      color: #e0e0e0;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    .refresh-btn:hover { background: #4b5563; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Custom Provider Tokens</h1>
+    <p class="subtitle">Available quota tracker for custom OpenAI-compatible providers</p>
+    
+    <button class="refresh-btn" onclick="loadData()">↻ Refresh All</button>
+    
+    <div id="content"></div>
+  </div>
+
+  <script>
+    let allData = [];
+    
+    async function loadData() {
+      const content = document.getElementById('content');
+      content.innerHTML = '<div class="loading">Loading providers...</div>';
+      
+      try {
+        const res = await fetch('/api/custom-usage/totals');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        
+        allData = json.result || [];
+        
+        if (allData.length === 0) {
+          content.innerHTML = '<div class="error">No custom providers found. Add OpenAI-compatible providers in the Providers page.</div>';
+          return;
+        }
+        
+        renderProviders();
+        
+        // Auto-probe all keys on load
+        autoProbeAll();
+        
+      } catch (e) {
+        content.innerHTML = `<div class="error">Failed to load data: ${e.message}</div>`;
+      }
+    }
+    
+    function renderProviders() {
+      const content = document.getElementById('content');
+      
+      // Summary cards
+      const totalProviders = allData.length;
+      const totalKeys = allData.reduce((sum, p) => sum + p.keys.length, 0);
+      
+      let html = `
+        <div class="summary-cards">
+          <div class="card">
+            <div class="card-label">Total Providers</div>
+            <div class="card-value">${totalProviders}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Total Keys</div>
+            <div class="card-value">${totalKeys}</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Status</div>
+            <div class="card-value" style="font-size: 20px; color: #4ade80;">● Active</div>
+            <div class="card-sub">Monitoring quota</div>
+          </div>
+        </div>
+      `;
+      
+      // Provider sections
+      allData.forEach(provider => {
+        const activeKeys = provider.keys.filter(k => k.testStatus === 'active').length;
+        
+        html += `
+          <div class="provider-section">
+            <div class="provider-header">
+              <div>
+                <div class="provider-title">${provider.name}</div>
+                <div class="provider-meta">${provider.baseUrl || 'No base URL'} • Prefix: ${provider.prefix || 'none'}</div>
+              </div>
+              <div class="provider-stats">
+                <div class="stat-item">
+                  <div class="stat-label">Keys</div>
+                  <div class="stat-value">${provider.keys.length}</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-label">Available</div>
+                  <div class="stat-value" id="provider-total-${provider.nodeId}">—</div>
+                </div>
+              </div>
+            </div>
+            
+            <table class="keys-table">
+              <thead>
+                <tr>
+                  <th>Key Name</th>
+                  <th>Status</th>
+                  <th style="width: 40%;">Available Quota</th>
+                  <th style="text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${provider.keys.map((key, idx) => `
+                  <tr>
+                    <td><span class="key-name">${key.keyName}</span></td>
+                    <td>
+                      <span class="status-badge ${
+                        key.testStatus === 'active' ? 'status-active' : 
+                        key.testStatus === 'error' ? 'status-error' : 
+                        'status-unknown'
+                      }">
+                        ${key.testStatus || 'unknown'}
+                      </span>
+                    </td>
+                    <td>
+                      <div id="quota-${key.connectionId}" class="quota-info quota-loading">
+                        Checking...
+                      </div>
+                      <div class="quota-bar" id="bar-${key.connectionId}" style="display: none;">
+                        <div class="quota-fill"></div>
+                      </div>
+                    </td>
+                    <td style="text-align: center;">
+                      <button class="probe-btn" onclick="probeKey('${provider.nodeId}', '${key.connectionId}', '${provider.baseUrl}')">
+                        🔍 Check
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
+      });
+      
+      content.innerHTML = html;
+    }
+    
+    async function probeKey(nodeId, keyId, baseUrl) {
+      const quotaEl = document.getElementById(`quota-${keyId}`);
+      const barEl = document.getElementById(`bar-${keyId}`);
+      
+      quotaEl.className = 'quota-info quota-loading';
+      quotaEl.textContent = 'Checking quota...';
+      barEl.style.display = 'none';
+      
+      try {
+        const res = await fetch(`/api/custom-usage/probe-quota?nodeId=${nodeId}&keyId=${keyId}&baseUrl=${encodeURIComponent(baseUrl)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const data = await res.json();
+        
+        if (!data || (data.limit === null && data.used === null && data.remaining === null)) {
+          quotaEl.className = 'quota-info';
+          quotaEl.textContent = '❌ No quota API found';
+          return;
+        }
+        
+        const { used, limit, remaining, percentage } = data;
+        quotaEl.className = 'quota-info quota-success';
+        
+        if (remaining !== null && limit !== null) {
+          quotaEl.textContent = `✓ ${formatNumber(remaining)} / ${formatNumber(limit)} remaining (${100 - percentage}% available)`;
+          
+          barEl.style.display = 'block';
+          const fill = barEl.querySelector('.quota-fill');
+          fill.style.width = `${100 - percentage}%`;
+          fill.className = `quota-fill ${
+            percentage < 50 ? 'quota-ok' : 
+            percentage < 80 ? 'quota-warn' : 
+            'quota-critical'
+          }`;
+        } else if (remaining !== null) {
+          quotaEl.textContent = `✓ ${formatNumber(remaining)} remaining`;
+        } else if (limit !== null && used !== null) {
+          quotaEl.textContent = `✓ ${formatNumber(used)} / ${formatNumber(limit)} used`;
+        } else {
+          quotaEl.textContent = '✓ Quota available';
+        }
+        
+        updateProviderTotal(nodeId);
+        
+      } catch (e) {
+        quotaEl.className = 'quota-info quota-error';
+        quotaEl.textContent = `❌ Error: ${e.message}`;
+      }
+    }
+    
+    function updateProviderTotal(nodeId) {
+      const provider = allData.find(p => p.nodeId === nodeId);
+      if (!provider) return;
+      
+      let totalRemaining = 0;
+      let hasData = false;
+      
+      provider.keys.forEach(key => {
+        const quotaEl = document.getElementById(`quota-${key.connectionId}`);
+        if (!quotaEl) return;
+        
+        const text = quotaEl.textContent;
+        const match = text.match(/✓\s+([\d,\.]+\s*[KMB]?)\s+/);
+        if (match) {
+          totalRemaining += parseNumber(match[1]);
+          hasData = true;
+        }
+      });
+      
+      const totalEl = document.getElementById(`provider-total-${nodeId}`);
+      if (totalEl && hasData) {
+        totalEl.textContent = formatNumber(totalRemaining);
+      }
+    }
+    
+    async function autoProbeAll() {
+      for (const provider of allData) {
+        for (const key of provider.keys) {
+          await probeKey(provider.nodeId, key.connectionId, provider.baseUrl);
+          await new Promise(r => setTimeout(r, 500)); // Rate limit
+        }
+      }
+    }
+    
+    function formatNumber(n) {
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+      return n.toLocaleString();
+    }
+    
+    function parseNumber(str) {
+      const multipliers = { K: 1e3, M: 1e6, B: 1e9 };
+      const match = str.match(/([\d,\.]+)\s*([KMB]?)/);
+      if (!match) return 0;
+      const num = parseFloat(match[1].replace(/,/g, ''));
+      const mult = multipliers[match[2]] || 1;
+      return num * mult;
+    }
+    
+    // Load on page ready
+    loadData();
+  </script>
+</body>
+</html>
