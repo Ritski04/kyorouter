@@ -11,6 +11,14 @@ export default function CustomTokensPageClient() {
   const [error, setError] = useState(null);
   const [probing, setProbing] = useState({});
   const [lastUsed, setLastUsed] = useState({}); // Track last accessed time per provider
+  const [quotaSupport, setQuotaSupport] = useState(() => {
+    // Load from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('kyorouter_quota_support');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
 
   // Load providers with SQLite cache on mount
   useEffect(() => {
@@ -65,11 +73,16 @@ export default function CustomTokensPageClient() {
         });
         
         // Merge cache with provider data
+        const probedKeys = typeof window !== 'undefined' ? (JSON.parse(localStorage.getItem('kyorouter_probed_keys') || '{}')) : {};
         const providersWithCache = (data.result || data).map(provider => ({
           ...provider,
           keys: provider.keys.map(key => {
             const cached = quotaMap.get(`${provider.nodeId}-${key.connectionId}`);
-            return cached ? { ...key, quota: cached, quotaProbed: true } : key;
+            // cached → quota + probed
+            if (cached) return { ...key, quota: cached, quotaProbed: true };
+            // previously tried & failed (transient/unsupported) → don't auto re-probe. persisted in localStorage
+            if (probedKeys[`${provider.nodeId}-${key.connectionId}`]) return { ...key, quotaProbed: true, quotaUnsupported: true };
+            return key;
           })
         }));
         
@@ -89,43 +102,149 @@ export default function CustomTokensPageClient() {
   // Auto-fetch quota on first load when providers are ready
   useEffect(() => {
     if (providers.length > 0 && !loading) {
+      console.log('[AutoFetch] Starting auto-fetch check, quotaSupport state:', quotaSupport);
+      
       // Only probe providers with empty/stale cache
       providers.forEach(provider => {
+        console.log(`[AutoFetch] Checking ${provider.name} (nodeId: ${provider.nodeId})`);
+        
+        // Check if provider supports quota API
+        if (!shouldProbeProvider(provider)) {
+          console.log(`[AutoFetch] ${provider.name}: SKIPPED by shouldProbeProvider`);
+          return;
+        }
+        
         const hasStaleCache = provider.keys.some(key => {
-          if (!key.quotaProbed || !key.quota) return true; // No cache
-          // Check if any key has cache (from SQLite) - if all keys have cache, skip
+          // No cache AND not yet probed = needs probe
+          if (!key.quotaProbed) return true;
+          // probed but quota present → skip (cache already loaded)
+          // probed without quota → already tried, don't re-probe automatically
           return false;
         });
+        
+        console.log(`[AutoFetch] ${provider.name}: hasStaleCache=${hasStaleCache}, keys=${provider.keys.length}`);
         
         // Probe only if at least one key has no cached data
         if (hasStaleCache) {
           console.log(`[AutoFetch] Probing ${provider.name} (has stale/empty cache)`);
           probeAllKeys(provider);
         } else {
-          console.log(`[AutoFetch] Skipping ${provider.name} (cache valid)`);
+          console.log(`[AutoFetch] Skipping ${provider.name} (all keys cached)`);
         }
       });
     }
-  }, [providers.length, loading]); // Trigger when providers are loaded
+  }, [providers.length, loading]); // Remove quotaSupport dependency to prevent infinite loop
+
+  // Helper: Update quota support status and save to localStorage
+  function updateQuotaSupport(nodeId, supported) {
+    const updated = {
+      ...quotaSupport,
+      [nodeId]: {
+        supported,
+        lastChecked: Date.now()
+      }
+    };
+    setQuotaSupport(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('kyorouter_quota_support', JSON.stringify(updated));
+    }
+    console.log(`[QuotaSupport] ${nodeId}: ${supported ? 'SUPPORTED' : 'UNSUPPORTED'}`);
+  }
+
+  // Helper: Check if provider should be probed
+  function shouldProbeProvider(provider) {
+    const support = quotaSupport[provider.nodeId];
+    const RECHECK_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 7 days
+    
+    // Unknown support → probe to detect
+    if (!support) return true;
+    
+    // Marked unsupported → skip (unless recheck time passed)
+    if (!support.supported) {
+      const needsRecheck = Date.now() - support.lastChecked > RECHECK_INTERVAL;
+      if (needsRecheck) {
+        console.log(`[QuotaSupport] ${provider.name}: Re-checking after 7 days`);
+        return true;
+      }
+      console.log(`[QuotaSupport] ${provider.name}: SKIP (marked unsupported)`);
+      return false;
+    }
+    
+    // Supported → continue normal logic
+    return true;
+  }
+
+  // Helper: persist a key as "already probed" so it's not auto-re-probed every load
+  function persistProbedKeys(nodeId, connectionIds) {
+    if (typeof window === 'undefined') return;
+    const key = `${nodeId}-`;
+    let probed = {};
+    try { probed = JSON.parse(localStorage.getItem('kyorouter_probed_keys') || '{}'); } catch {}
+    connectionIds.forEach(cid => { probed[key + cid] = true; });
+    localStorage.setItem('kyorouter_probed_keys', JSON.stringify(probed));
+  }
 
   async function probeAllKeys(provider) {
     const activeKeys = provider.keys.filter(k => k.testStatus === 'active');
+    // Only probe keys that have no cached quota yet (not probed). Once a key is
+    // probed (success OR fail), quotaProbed=true → skipped on subsequent loads.
+    // This prevents re-probing 1000+ keys just because 2 keys lack cache.
+    const keysToProbe = activeKeys.filter(k => !k.quotaProbed);
+    if (keysToProbe.length === 0) {
+      console.log(`[AutoFetch] ${provider.name}: all ${activeKeys.length} keys already probed, skipping probe`);
+      return;
+    }
     
     const BATCH_SIZE = 50;
     const results = [];
+    const probedFallback = new Set(); // keys that failed/null — mark probed so no re-loop
     
     // Process in batches to reduce UI jitter
-    for (let i = 0; i < activeKeys.length; i++) {
-      const key = activeKeys[i];
+    for (let i = 0; i < keysToProbe.length; i++) {
+      const key = keysToProbe[i];
       const result = await probeSingleQuota(provider.nodeId, key.connectionId, key.keyName, provider.baseUrl);
+      
+      // Backend reported no quota endpoint for this key.
+      // If this provider already has cached quota data, its endpoint DOES work —
+      // this is a per-key failure (bad key / rate-limit), don't punish the provider.
+      if (result && result.unsupported) {
+        const hasCachedData = provider.keys.some(k => k.quotaProbed && k.quota);
+        if (hasCachedData) {
+          console.log(`[QuotaSupport] ${provider.name}: per-key failure (provider has cached data), not marking unsupported`);
+          probedFallback.add(key.connectionId);
+          persistProbedKeys(provider.nodeId, [key.connectionId]);
+        } else {
+          // No cached data at all → genuinely no quota endpoint → mark provider unsupported
+          updateQuotaSupport(provider.nodeId, false);
+          // Mark ALL keys as probed + unsupported so they're never auto-probed again
+          setProviders(prev => prev.map(p => {
+            if (p.nodeId !== provider.nodeId) return p;
+            return {
+              ...p,
+              keys: p.keys.map(k => ({ ...k, quotaProbed: true, quotaUnsupported: true }))
+            };
+          }));
+          if (selectedProvider?.nodeId === provider.nodeId) {
+            setSelectedProvider(prev => prev ? { ...prev, keys: prev.keys.map(k => ({ ...k, quotaProbed: true, quotaUnsupported: true })) } : prev);
+          }
+          persistProbedKeys(provider.nodeId, keysToProbe.map(k => k.connectionId));
+          console.log(`[QuotaSupport] ${provider.name}: UNSUPPORTED confirmed, stopping probe of remaining ${keysToProbe.length - i} keys`);
+          return;
+        }
+      }
       
       if (result) {
         results.push({ connectionId: key.connectionId, quota: result });
+      } else if (result === null) {
+        // probe failed (network/transient/no data) → mark this key probed so it's not re-probed every load.
+        // quotaProbed w/o quota shows "—" in UI; scoped so it won't loop. Persist so next load skips it too.
+        probedFallback.add(key.connectionId);
+        persistProbedKeys(provider.nodeId, [key.connectionId]);
       }
-      
+
       // Batch update every 50 keys or at the end
       if (results.length >= BATCH_SIZE || i === activeKeys.length - 1) {
-        if (results.length > 0) {
+        if (results.length > 0 || probedFallback.size > 0) {
           // Batch state update
           setProviders(prev => prev.map(p => {
             if (p.nodeId !== provider.nodeId) return p;
@@ -133,7 +252,9 @@ export default function CustomTokensPageClient() {
               ...p,
               keys: p.keys.map(k => {
                 const resultData = results.find(r => r.connectionId === k.connectionId);
-                return resultData ? { ...k, quota: resultData.quota, quotaProbed: true } : k;
+                if (resultData) return { ...k, quota: resultData.quota, quotaProbed: true };
+                if (probedFallback.has(k.connectionId)) return { ...k, quotaProbed: true };
+                return k;
               })
             };
           }));
@@ -143,12 +264,15 @@ export default function CustomTokensPageClient() {
               ...prev,
               keys: prev.keys.map(k => {
                 const resultData = results.find(r => r.connectionId === k.connectionId);
-                return resultData ? { ...k, quota: resultData.quota, quotaProbed: true } : k;
+                if (resultData) return { ...k, quota: resultData.quota, quotaProbed: true };
+                if (probedFallback.has(k.connectionId)) return { ...k, quotaProbed: true };
+                return k;
               })
             }));
           }
           
           results.length = 0; // Clear batch
+          probedFallback.clear();
         }
       }
       
@@ -162,7 +286,15 @@ export default function CustomTokensPageClient() {
       const res = await fetch(`/api/custom-usage/probe-quota?nodeId=${nodeId}&keyId=${connectionId}&baseUrl=${encodeURIComponent(baseUrl)}`);
       const data = await res.json();
       
-      if (data && (data.limit !== null || data.used !== null || data.remaining !== null)) {
+      // Backend definitively found no quota endpoint for this provider
+      if (data && data.unsupported) {
+        return { unsupported: true };
+      }
+      
+      if (data && (data.limit != null || data.used != null || data.remaining != null)) {
+        // Mark provider as supporting quota
+        updateQuotaSupport(nodeId, true);
+        
         // Save to SQLite cache
         await fetch('/api/quota-cache', {
           method: 'POST',
@@ -178,8 +310,11 @@ export default function CustomTokensPageClient() {
         });
         
         return data;
+      } else {
+        console.log(`[QuotaSupport] ${nodeId}: No quota data, but not marking unsupported yet`);
       }
     } catch (e) {
+      // Network error / fetch failed → DON'T mark unsupported (could be temp issue)
       console.error(`Probe failed for ${keyName}:`, e.message);
     }
     return null;
@@ -193,7 +328,34 @@ export default function CustomTokensPageClient() {
       const res = await fetch(`/api/custom-usage/probe-quota?nodeId=${nodeId}&keyId=${connectionId}&baseUrl=${encodeURIComponent(baseUrl)}`);
       const data = await res.json();
       
-      if (data && (data.limit !== null || data.used !== null)) {
+      // Backend definitively found no quota endpoint
+      if (data && data.unsupported) {
+        // Guard: if provider already has cached quota, a single bad key shouldn't do this
+        const p = providers.find(x => x.nodeId === nodeId);
+        const hasCachedData = p && p.keys.some(k => k.quotaProbed && k.quota);
+        if (!hasCachedData) {
+          updateQuotaSupport(nodeId, false);
+          setProviders(prev => prev.map(x => {
+            if (x.nodeId !== nodeId) return x;
+            return { ...x, keys: x.keys.map(k =>
+              k.connectionId === connectionId ? { ...k, quotaUnsupported: true, quotaProbed: true } : k
+            ) };
+          }));
+          if (selectedProvider?.nodeId === nodeId) {
+            setSelectedProvider(prev => ({ ...prev, keys: prev.keys.map(k =>
+              k.connectionId === connectionId ? { ...k, quotaUnsupported: true, quotaProbed: true } : k
+            ) }));
+          }
+        }
+        persistProbedKeys(nodeId, [connectionId]);
+        return;
+      }
+      
+      const hasQuota = data && (data.limit != null || data.used != null || data.remaining != null);
+      if (hasQuota) {
+        // Mark provider as supporting quota
+        updateQuotaSupport(nodeId, true);
+        
         // Save to SQLite cache
         await fetch('/api/quota-cache', {
           method: 'POST',
@@ -228,14 +390,20 @@ export default function CustomTokensPageClient() {
           }));
         }
       } else {
-        // Provider doesn't expose quota - mark as unsupported instead of error
+        // No quota data for this key. Only mark provider unsupported if it has NO cached data.
+        const pr = providers.find(x => x.nodeId === nodeId);
+        const hasCachedData = pr && pr.keys.some(k => k.quotaProbed && k.quota);
+        if (!hasCachedData) {
+          updateQuotaSupport(nodeId, false);
+        }
+        // Mark THIS key probed (so auto-fetch won't retry it)
         setProviders(prev => prev.map(p => {
           if (p.nodeId !== nodeId) return p;
           return {
             ...p,
             keys: p.keys.map(k => {
               if (k.connectionId !== connectionId) return k;
-              return { ...k, quotaUnsupported: true, quotaProbed: true };
+              return { ...k, quotaUnsupported: !hasCachedData, quotaProbed: true };
             })
           };
         }));
@@ -244,10 +412,11 @@ export default function CustomTokensPageClient() {
             ...prev,
             keys: prev.keys.map(k => {
               if (k.connectionId !== connectionId) return k;
-              return { ...k, quotaUnsupported: true, quotaProbed: true };
+              return { ...k, quotaUnsupported: !hasCachedData, quotaProbed: true };
             })
           }));
         }
+        persistProbedKeys(nodeId, [connectionId]);
       }
     } catch (e) {
       alert(`Probe error: ${e.message}`);
@@ -331,7 +500,7 @@ export default function CustomTokensPageClient() {
             <div className="text-text-muted text-sm mb-1">Total Tokens Used</div>
             <div className="text-2xl font-bold text-text-primary">
               {(selectedProvider?.keys
-                ?.filter(k => k.quota?.used !== null && k.quota?.used !== undefined)
+                ?.filter(k => k.quota?.used != null)
                 .reduce((sum, k) => sum + k.quota.used, 0) || 0)
                 .toLocaleString()}
             </div>
@@ -340,7 +509,7 @@ export default function CustomTokensPageClient() {
             <div className="text-text-muted text-sm mb-1">Total Tokens Limit</div>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {(selectedProvider?.keys
-                ?.filter(k => k.quota?.limit !== null && k.quota?.limit !== undefined)
+                ?.filter(k => k.quota?.limit != null)
                 .reduce((sum, k) => sum + k.quota.limit, 0) || 0)
                 .toLocaleString()}
             </div>
@@ -378,46 +547,50 @@ export default function CustomTokensPageClient() {
                           </Badge>
                         </td>
                         <td className="py-3 px-3 text-text-primary">
-                          {key.quotaProbed && key.quota && (key.quota.used !== null || key.quota.limit !== null || key.quota.remaining !== null) ? (
+                          {key.quotaProbed && key.quota && (key.quota.used != null || key.quota.limit != null || key.quota.remaining != null) ? (
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1">
                                   <div className="flex items-center justify-between text-xs mb-1">
                                     <span className="font-medium">
-                                      {key.quota.used !== null && key.quota.limit !== null
+                                      {key.quota.used != null && key.quota.limit != null
                                         ? key.quota.used > key.quota.limit
                                           ? 'Over Quota'
-                                          : `${((key.quota.used / key.quota.limit) * 100).toFixed(1)}% used`
-                                        : key.quota.remaining !== null
+                                          : `${(((key.quota.limit - key.quota.used) / key.quota.limit) * 100).toFixed(1)}% remaining`
+                                        : key.quota.remaining != null
                                         ? `${key.quota.remaining.toLocaleString()} remaining`
                                         : 'Available'}
                                     </span>
-                                    {key.quota.limit !== null && (
+                                    {key.quota.limit != null && (
                                       <span className="text-text-muted">
                                         {key.quota.limit.toLocaleString()} limit
                                       </span>
                                     )}
                                   </div>
-                                  {key.quota.used !== null && key.quota.limit !== null && (
-                                    <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2">
-                                      <div
-                                        className={`h-2 rounded-full transition-all ${
-                                          (key.quota.used / key.quota.limit) > 0.9
-                                            ? 'bg-red-500'
-                                            : (key.quota.used / key.quota.limit) > 0.7
-                                            ? 'bg-yellow-500'
-                                            : 'bg-green-500'
-                                        }`}
-                                        style={{ width: `${Math.min((key.quota.used / key.quota.limit) * 100, 100)}%` }}
-                                      />
-                                    </div>
-                                  )}
+                                  {key.quota.used != null && key.quota.limit != null && (() => {
+                                    const remaining = Math.max(key.quota.limit - key.quota.used, 0);
+                                    const remainingPct = (remaining / key.quota.limit) * 100;
+                                    return (
+                                      <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2">
+                                        <div
+                                          className={`h-2 rounded-full transition-all ${
+                                            remainingPct < 0.1
+                                              ? 'bg-red-500'
+                                              : remainingPct < 0.3
+                                              ? 'bg-yellow-500'
+                                              : 'bg-green-500'
+                                          }`}
+                                          style={{ width: `${Math.min(remainingPct, 100)}%` }}
+                                        />
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               </div>
-                              {key.quota.used !== null && (
+                              {key.quota.used != null && (
                                 <div className="text-xs text-text-muted">
                                   {key.quota.used.toLocaleString()} used
-                                  {key.quota.remaining !== null && ` / ${key.quota.remaining.toLocaleString()} remaining`}
+                                  {key.quota.remaining != null && ` / ${key.quota.remaining.toLocaleString()} remaining`}
                                 </div>
                               )}
                             </div>
@@ -493,10 +666,10 @@ export default function CustomTokensPageClient() {
         {providers.map(provider => {
           const activeCount = provider.keys.filter(k => k.testStatus === 'active').length;
           const totalUsed = provider.keys
-            .filter(k => k.quota?.used !== null && k.quota?.used !== undefined)
+            .filter(k => k.quota?.used != null)
             .reduce((sum, k) => sum + k.quota.used, 0);
           const totalLimit = provider.keys
-            .filter(k => k.quota?.limit !== null && k.quota?.limit !== undefined)
+            .filter(k => k.quota?.limit != null)
             .reduce((sum, k) => sum + k.quota.limit, 0);
           const percentage = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0;
           const hasQuotaData = totalLimit > 0;
@@ -526,7 +699,7 @@ export default function CustomTokensPageClient() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-text-primary">
-                        {percentage >= 100 ? 'Over Quota' : `${percentage.toFixed(1)}% used`}
+                        {percentage >= 100 ? 'Over Quota' : `${(100 - percentage).toFixed(1)}% remaining`}
                       </span>
                       <span className="text-text-muted">
                         {totalLimit.toLocaleString()} limit
@@ -535,17 +708,17 @@ export default function CustomTokensPageClient() {
                     <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full transition-all ${
-                          percentage > 90
+                          (100 - percentage) < 0.1
                             ? 'bg-red-500'
-                            : percentage > 70
+                            : (100 - percentage) < 0.3
                             ? 'bg-yellow-500'
                             : 'bg-green-500'
                         }`}
-                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                        style={{ width: `${Math.min(100 - percentage, 100)}%` }}
                       />
                     </div>
                     <div className="text-xs text-text-muted">
-                      {totalUsed.toLocaleString()} used / {(totalLimit - totalUsed).toLocaleString()} remaining
+                      {(totalLimit - totalUsed).toLocaleString()} remaining / {totalUsed.toLocaleString()} used
                     </div>
                   </div>
                 )}

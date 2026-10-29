@@ -4,6 +4,14 @@ const fs = require("fs");
 const crypto = require("crypto");
 const { pathToFileURL } = require("url");
 
+// SQLite via built-in node:sqlite (no native module compile mismatches)
+const { DatabaseSync } = require("node:sqlite");
+
+// DB path helper (shared by all quota handlers)
+function _dbPath() {
+  return path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
+}
+
 const origCreate = http.createServer.bind(http);
 
 // Per-process secret proving x-9r-real-ip was stamped below rather than sent by the client.
@@ -163,9 +171,7 @@ async function handleCustomUsageTotals(req, res) {
   }
   
   try {
-    const Database = require("better-sqlite3");
-    const dbPath = path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
-    const db = new Database(dbPath, { readonly: true });
+    const db = new DatabaseSync(_dbPath(), { readOnly: true });
     
     // Query only provider nodes and connections, no usage history
     const query = `
@@ -249,9 +255,7 @@ async function handleProbeQuota(req, res) {
   
   // Read API key from DB
   try {
-    const Database = require("better-sqlite3");
-    const dbPath = path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
-    const db = new Database(dbPath, { readonly: true });
+    const db = new DatabaseSync(_dbPath(), { readOnly: true });
     const row = db.prepare("SELECT json_extract(data, '$.apiKey') as apiKey FROM providerConnections WHERE id = ?").get(keyId);
     db.close();
     
@@ -268,9 +272,7 @@ async function handleProbeQuota(req, res) {
       if (data && baseUrl.includes('dahl.global') && data.remaining !== null && data.limit === null) {
         // Load cached limit from SQLite
         _ensureQuotaCacheTable();
-        const Database = require("better-sqlite3");
-        const dbPath = path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
-        const cacheDb = new Database(dbPath, { readonly: true });
+        const cacheDb = new DatabaseSync(_dbPath(), { readOnly: true });
         const cached = cacheDb.prepare("SELECT \"limit\" FROM quota_snapshots WHERE nodeId = ? AND connectionId = ?").get(nodeId, keyId);
         cacheDb.close();
       
@@ -289,8 +291,10 @@ async function handleProbeQuota(req, res) {
     
       _setQuotaCache(nodeId, keyId, data);
     
-    res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
-    res.end(JSON.stringify(data));
+      res.writeHead(200, { "Content-Type": "application/json", "X-Cache": "MISS" });
+      // null = definitively no quota endpoint found (all standard endpoints tried)
+      // → tell frontend to mark provider unsupported instead of re-probing every time
+      res.end(JSON.stringify(data || { unsupported: true }));
   } catch (e) {
     res.writeHead(500);
     res.end(JSON.stringify({ error: e.message }));
@@ -299,9 +303,7 @@ async function handleProbeQuota(req, res) {
 
 // ─── Quota Cache SQLite Handlers ─────────────────────────────────────────────
 function _ensureQuotaCacheTable() {
-  const Database = require("better-sqlite3");
-  const dbPath = path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(_dbPath());
   
   db.exec(`
     CREATE TABLE IF NOT EXISTS quota_snapshots (
@@ -330,9 +332,7 @@ async function handleQuotaCacheGet(req, res) {
   
   try {
     _ensureQuotaCacheTable();
-    const Database = require("better-sqlite3");
-    const dbPath = path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
-    const db = new Database(dbPath, { readonly: true });
+    const db = new DatabaseSync(_dbPath(), { readOnly: true });
     
     // Get all quota snapshots, delete older than 7 days
     const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
@@ -371,9 +371,7 @@ async function handleQuotaCachePost(req, res) {
       }
       
       _ensureQuotaCacheTable();
-      const Database = require("better-sqlite3");
-      const dbPath = path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
-      const db = new Database(dbPath);
+      const db = new DatabaseSync(_dbPath());
       
       // Upsert quota snapshot
       db.prepare(`
