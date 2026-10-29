@@ -25,6 +25,7 @@ import { takeRenamedToolNames } from "../utils/opencodeFingerprint.js";
 import { injectCaveman } from "../rtk/caveman.js";
 import { injectPonytail } from "../rtk/ponytail.js";
 import { injectCustomPrompt } from "../rtk/customPrompt.js";
+import { resolveComboModelPrompt, injectComboModelPrompt } from "../rtk/comboModelPrompt.js";
 import { compressMessages, formatRtkLog } from "../rtk/index.js";
 import { compressWithHeadroom, formatHeadroomLog, formatHeadroomSizeLog, isHeadroomPhantomSavings } from "../rtk/headroom.js";
 import { compressWithPxpipe } from "../rtk/pxpipe.js";
@@ -61,7 +62,7 @@ export function stripContinuityFields(body) {
   return body;
 }
 
-export async function handleChatCore({ body, modelInfo, credentials, log, onCredentialsRefreshed, onRequestSuccess, onDisconnect, clientRawRequest, connectionId, userAgent, apiKey, ccFilterNaming, rtkEnabled, headroomEnabled, headroomUrl, headroomCompressUserMessages, headroomTimeoutMs, cavemanEnabled, cavemanLevel, ponytailEnabled, ponytailLevel, customPromptEnabled, customPrompt, pxpipeEnabled, pxpipeMinChars, pxpipeTimeoutMs, pxpipeTransform, onPxpipeEvent, sourceFormatOverride, providerThinking, providerOverrides }) {
+export async function handleChatCore({ body, modelInfo, credentials, log, onCredentialsRefreshed, onRequestSuccess, onDisconnect, clientRawRequest, connectionId, userAgent, apiKey, ccFilterNaming, rtkEnabled, headroomEnabled, headroomUrl, headroomCompressUserMessages, headroomTimeoutMs, cavemanEnabled, cavemanLevel, ponytailEnabled, ponytailLevel,  customPromptEnabled, customPrompt, comboPrompts, modelPrompts, comboName, pxpipeEnabled, pxpipeMinChars, pxpipeTimeoutMs, pxpipeTransform, onPxpipeEvent, sourceFormatOverride, providerThinking, providerOverrides }) {
   const { provider, model } = modelInfo;
   const requestStartTime = Date.now();
   // Stable per-session color so all lines of one CLI conversation share a tag
@@ -313,6 +314,20 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // Custom prompt: user-authored instruction, independent of the savers above
   if (customPromptEnabled && injectCustomPrompt(translatedBody, finalFormat, customPrompt)) {
     xf.push(`CUSTOMPROMPT:${customPrompt.trim().length}c`);
+  }
+
+  // Per-combo / per-model prompt: additive layer on top of the global custom prompt.
+  // Model-level beats combo-level; members without their own fall back to the combo prompt.
+  // Key for per-model prompts = the routed member string (e.g. "gonka24/claude-5"),
+  // which is what the user configures — not the upstream model id.
+  const comboModelCtx = {
+    settings: { modelPrompts: modelPrompts || {}, comboPrompts: comboPrompts || {} },
+    model: model,
+    comboName: comboName || null,
+  };
+  const comboModelRes = resolveComboModelPrompt(comboModelCtx);
+  if (comboModelRes && injectComboModelPrompt(translatedBody, finalFormat, comboModelRes)) {
+    xf.push(`COMBO/MODEL:${comboModelRes.source}:${comboModelRes.text.trim().length}c`);
   }
 
   // PXPIPE: image bulky context (Claude-format bodies only), last saver before dispatch

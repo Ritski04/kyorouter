@@ -61,6 +61,10 @@ const DEFAULT_SETTINGS = {
   // User-authored system prompt, injected independently of the built-in savers.
   customPromptEnabled: false,
   customPrompt: "",
+  // Per-combo and per-model prompt injection maps, independent of the global
+  // customPrompt. { [comboName]: { text, enabled } } and { [model]: { text, enabled } }.
+  comboPrompts: {},
+  modelPrompts: {},
   pxpipeEnabled: false,
   pxpipeAutoInstall: true,
   pxpipeMinChars: 25000,

@@ -9,7 +9,7 @@ const { DatabaseSync } = require("node:sqlite");
 
 // DB path helper (shared by all quota handlers)
 function _dbPath() {
-  return path.join(process.env.APPDATA || process.env.HOME, "9router", "db", "data.sqlite");
+  return path.join(process.env.APPDATA || process.env.HOME, "kyorouter", "db", "data.sqlite");
 }
 
 const origCreate = http.createServer.bind(http);

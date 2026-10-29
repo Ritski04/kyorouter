@@ -97,8 +97,8 @@ function maskKey(key) {
 function savedEnvPath() {
   if (process.env.DATA_DIR) return path.join(process.env.DATA_DIR, "connect.env");
   const base = process.platform === "win32"
-    ? path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "9router")
-    : path.join(os.homedir(), ".9router");
+    ? path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "kyorouter")
+    : path.join(os.homedir(), ".kyorouter");
   return path.join(base, "connect.env");
 }
 

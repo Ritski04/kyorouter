@@ -3,7 +3,7 @@ const path = require("path");
 const os = require("os");
 const { execSync } = require("child_process");
 
-const APP_NAME = "9router";
+const APP_NAME = "kyorouter";
 const APP_LABEL = "com.9router.autostart";
 
 /**

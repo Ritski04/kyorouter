@@ -15,7 +15,7 @@ const getConfigPath = () => path.join(getJcodeConfigDir(), "config.toml");
 
 const getProviderEnvPath = () => {
   const configDir = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-  return path.join(configDir, "jcode", "provider-9router.env");
+  return path.join(configDir, "jcode", "provider-kyorouter.env");
 };
 
 const checkJcodeInstalled = async () => {
