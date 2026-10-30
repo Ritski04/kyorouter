@@ -65,6 +65,9 @@ const DEFAULT_SETTINGS = {
   // customPrompt. { [comboName]: { text, enabled } } and { [model]: { text, enabled } }.
   comboPrompts: {},
   modelPrompts: {},
+  // User-managed prompt templates for the injection page. Persisted so users can
+  // build their own and reuse them across combos/models. Shape: [{ id, label, text }].
+  promptTemplates: [],
   pxpipeEnabled: false,
   pxpipeAutoInstall: true,
   pxpipeMinChars: 25000,

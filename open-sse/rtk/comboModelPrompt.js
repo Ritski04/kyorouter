@@ -22,20 +22,31 @@ import { injectSystemPrompt } from "./systemInject.js";
  * @param {string} opts.model - the routed model member string (e.g. "gonka24/claude-5")
  * @param {string|null} [opts.comboName] - combo name when request came through a combo
  */
-export function resolveComboModelPrompt({ settings, model, comboName }) {
+export function resolveComboModelPrompt({ settings, model, routedModel, comboName }) {
   try {
-    if (!settings || !model || typeof model !== "string") return null;
+    if (!settings || (!model && !routedModel)) return null;
 
     const modelPrompts = settings.modelPrompts || {};
     const comboPrompts = settings.comboPrompts || {};
 
-    // 1. Most specific: this exact routed model
-    const direct = modelPrompts[model];
-    if (direct && direct.enabled && typeof direct.text === "string" && direct.text.trim()) {
-      return { source: "model", text: direct.text };
+    // Try the exact routed member string first (e.g. "Dahl/deepseek-ai/DeepSeek-V4-Flash-0731")
+    const routedKeys = routedModel ? [routedModel, stripProviderPrefix(routedModel)] : [];
+    for (const key of routedKeys) {
+      const direct = modelPrompts[key];
+      if (direct && direct.enabled && typeof direct.text === "string" && direct.text.trim()) {
+        return { source: "model", text: direct.text, key };
+      }
     }
 
-    // 2. Combo-level fallback when the member has no prompt of its own
+    // Fall back to the bare model id (e.g. "deepseek-ai/DeepSeek-V4-Flash-0731")
+    if (model && model !== routedModel) {
+      const direct = modelPrompts[model];
+      if (direct && direct.enabled && typeof direct.text === "string" && direct.text.trim()) {
+        return { source: "model", text: direct.text, key: model };
+      }
+    }
+
+    // Combo-level fallback when the member has no prompt of its own
     if (comboName && comboPrompts[comboName]) {
       const comboEntry = comboPrompts[comboName];
       if (comboEntry && comboEntry.enabled && typeof comboEntry.text === "string" && comboEntry.text.trim()) {
@@ -47,6 +58,11 @@ export function resolveComboModelPrompt({ settings, model, comboName }) {
   } catch (_) {
     return null;
   }
+}
+
+function stripProviderPrefix(modelStr) {
+  const slash = modelStr.indexOf("/");
+  return slash > 0 ? modelStr.slice(slash + 1) : modelStr;
 }
 
 /**

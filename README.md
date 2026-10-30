@@ -36,6 +36,12 @@ KyoRouter is a high-performance API routing solution optimized for developers ma
 - 📝 **Request logging** — Debug and monitor API calls
 - 🔧 **Flexible config** — JSON-based provider setup
 
+### Prompt Injection
+- 💉 **Per-combo prompts** — Inject a system prompt on every request routed through a combo
+- 🎯 **Per-model prompts** — Set prompts directly on individual models (wins over combo prompts)
+- 🧩 **Additive layering** — Model/combo prompts stack on top of the global Token Saver prompt
+- 📚 **Reusable templates** — Save custom prompt templates and reuse them across combos/models
+
 ---
 
 ## 🚀 Quick Start
@@ -171,6 +177,21 @@ Automatic limit inference for providers that only return remaining tokens.
 ### SQLite Persistence
 Quota data survives server restarts. 7-day automatic cleanup keeps database lean.
 
+### Prompt Injection (per Combo / per Model)
+
+Inject custom system prompts at three levels, all additive — nothing replaces your global Token Saver skill prompt:
+
+1. **Per-model prompt** — most specific; applies when a request routes to that model.
+2. **Per-combo prompt** — fallback for combo members that have no prompt of their own.
+3. **Global Token Saver prompt** — always applies, stacked underneath the above.
+
+**Priority:** `per-model` → `per-combo` → `global`.
+
+- Configure in **Dashboard → Prompt Injection** (sidebar menu).
+- **Per Combo** tab: pick a combo, write its prompt, toggle enabled. Override any member’s prompt individually.
+- **Per Model** tab: add models from the same selector used on the Combo page, then set/disable each prompt. Models persist even when disabled; remove them with the ✕ button.
+- **Templates**: click **Templates** beside any prompt editor — pick a built-in prompt or save your current text as a reusable custom template. Your templates persist and appear under *Your templates*.
+
 ---
 
 ## 🤝 Contributing
@@ -218,6 +239,7 @@ KyoRouter adds:
 - Enhanced UI with batch updates
 - Dahl provider integration
 - Deep blue aesthetic redesign
+- Per-combo / per-model prompt injection with reusable templates
 
 ---
 

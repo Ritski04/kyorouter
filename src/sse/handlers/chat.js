@@ -335,6 +335,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       comboPrompts: chatSettings.comboPrompts || {},
       modelPrompts: chatSettings.modelPrompts || {},
       comboName: comboName || null,
+      routedModel: modelStr,
       pxpipeEnabled: !!chatSettings.pxpipeEnabled,
       pxpipeMinChars: chatSettings.pxpipeMinChars,
       pxpipeTimeoutMs: chatSettings.pxpipeTimeoutMs,
