@@ -48,8 +48,19 @@ KyoRouter is a high-performance API routing solution optimized for developers ma
 
 ### Installation
 
+KyoRouter is not published to the public npm registry, so install it from source (GitHub):
+
 ```bash
-npm install -g kyorouter
+# clone the repo
+git clone https://github.com/Ritski04/kyorouter.git
+cd kyorouter/cli
+
+# install dependencies & build
+npm install
+npm run build
+
+# install as a global command
+npm install -g .
 ```
 
 ### Start Server
@@ -81,22 +92,40 @@ curl http://localhost:20128/v1/chat/completions \
 
 ## 📦 Installation Options
 
-### NPM (Recommended)
+### From Source (Recommended)
 
-```bash
-npm install -g kyorouter
-kyorouter
-```
-
-### From Source
+> KyoRouter is **not published to the public npm registry** — `npm install -g kyorouter` will **not** work. Install from GitHub instead.
 
 ```bash
 git clone https://github.com/Ritski04/kyorouter.git
-cd kyorouter/cli
+cd kyorouter
 npm install
 npm run build
-npm start
+cd cli
+npm install
+npm run build
 ```
+
+### Install as Global Command
+
+From the `cli/` folder, link it so `kyorouter` works anywhere:
+
+```bash
+cd kyorouter/cli
+npm install -g .
+```
+
+### Updating a Global Install
+
+After new features are pushed to GitHub, update the global install with the provided script:
+
+```bash
+# from the repo root
+./update-global.bat       # Windows
+./update.sh               # Linux/macOS
+```
+
+The script: pulls the latest code → stops the running instance (port 20128) → rebuilds app + CLI → reinstalls the global package → restarts from the global build.
 
 ### Requirements
 
