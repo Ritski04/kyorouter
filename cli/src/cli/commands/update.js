@@ -1,0 +1,80 @@
+#!/usr/bin/env node
+// `kyorouter update` — pull the latest from GitHub, rebuild, and reinstall the
+// global package. Run from anywhere: it clones into the app-data dir so it
+// never touches a local dev folder.
+const { spawnSync } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
+const REPO = "https://github.com/Ritski04/kyorouter.git";
+const BRANCH = "main";
+const APP_NAME = "kyorouter";
+
+function appDataDir() {
+  return process.platform === "win32"
+    ? path.join(process.env.APPDATA || "", "kyorouter")
+    : path.join(os.homedir(), ".kyorouter");
+}
+
+function step(msg) {
+  console.log(`\n\x1b[36m==\x1b[0m ${msg}`);
+}
+
+function run(cmd, args, opts = {}) {
+  const res = spawnSync(cmd, args, { stdio: "inherit", ...opts });
+  if (res.status !== 0) {
+    console.error(`\n❌ Command failed: ${cmd} ${args.join(" ")}`);
+    process.exit(res.status || 1);
+  }
+}
+
+let workDir = path.join(appDataDir(), "update-src");
+
+function ensureDeps() {
+  // Fresh clone has no node_modules (repo outdoes not track deps). Install
+  // root + cli deps before building. Reuses cache, so repeats are quick.
+  const rootM = path.join(workDir, "node_modules");
+  const cliM = path.join(workDir, "cli", "node_modules");
+  if (!fs.existsSync(rootM)) {
+    step("Installing root dependencies");
+    run("npm", ["install"], { cwd: workDir });
+  }
+  if (!fs.existsSync(cliM)) {
+    step("Installing CLI dependencies");
+    run("npm", ["install"], { cwd: path.join(workDir, "cli") });
+  }
+}
+
+try {
+  if (!fs.existsSync(workDir)) {
+    step("Cloning kyorouter from GitHub");
+    run("git", ["clone", "--depth", "1", "--branch", BRANCH, REPO, workDir]);
+  } else {
+    step("Pulling latest from GitHub");
+    run("git", ["-C", workDir, "fetch", "origin", BRANCH]);
+    run("git", ["-C", workDir, "reset", "--hard", `origin/${BRANCH}`]);
+  }
+
+  ensureDeps();
+
+  step("Building the app + CLI (this takes a minute)");
+  run("npm", ["run", "build"], { cwd: workDir });
+  run("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
+
+  step("Reinstalling global package (breaks npm hardlink, fetch is fine)");
+  run("npm", ["uninstall", "-g", APP_NAME], { stdio: "ignore" });
+  run("npm", ["install", "-g", "."], { cwd: path.join(workDir, "cli") });
+
+  console.log(`
+\x1b[32m==========================================\x1b[0m
+  Update complete!
+  - Latest from GitHub: ${REPO}
+  - Global package reinstalled (free-standing copy)
+  - Restart the gateway to use the new build: kill it and run "kyorouter --tray"
+\x1b[32m==========================================\x1b[0m`);
+  process.exit(0);
+} catch (e) {
+  console.error(`\n❌ Update failed: ${e?.message || e}`);
+  process.exit(1);
+}

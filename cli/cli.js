@@ -80,6 +80,20 @@ if (args[0] === "xai" && args[1] === "video") {
   return;
 }
 
+// `kyorouter update` pulls the latest source from GitHub, rebuilds, and
+// reinstalls the global package so `kyorouter` runs the new build. It clones
+// into the app-data dir, never touching a local dev folder.
+if (args[0] === "update") {
+  const { run } = require("./src/cli/commands/update");
+  run(args.slice(1))
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      console.error(`❌ ${err?.message || err}`);
+      process.exit(1);
+    });
+  return;
+}
+
 // `9router connect <url>` configures local CLI tools against a remote server, and
 // `9router show` prints what they're currently set to — no local server, no
 // runtime deps. Usable via `npx 9router …`.
@@ -170,8 +184,10 @@ Options:
 Commands:
   connect <server-url> Configure Claude Code for a remote 9router server
                       (npx 9router connect http://host:20128 — no install needed)
-  show [tool…]        Show each CLI tool's current 9router config and models
+  show [tool…]   Show each CLI tool's current 9router config and models
                       (e.g. 9router show claude)
+  update              Pull latest from GitHub, rebuild, and reinstall the
+                      global package (run from anywhere: kyorouter update)
   xai video --prompt "..." --output video.mp4
                       Generate a Grok Imagine video via the running gateway
                       (see: ${APP_NAME} xai video --help)

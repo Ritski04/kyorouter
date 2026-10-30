@@ -117,15 +117,19 @@ npm install -g .
 
 ### Updating a Global Install
 
-After new features are pushed to GitHub, update the global install with the provided script:
+Once the global package is installed, update it from anywhere — no clone, no scripts:
 
 ```bash
-# from the repo root
-./update-global.bat       # Windows
-./update.sh               # Linux/macOS
+kyorouter update
 ```
 
-The script: pulls the latest code → stops the running instance (port 20128) → rebuilds app + CLI → reinstalls the global package → restarts from the global build.
+This pulls the latest source from GitHub (`Ritski04/kyorouter`), rebuilds the app + CLI into a temp folder, and reinstalls the global package. Restart the gateway afterwards to run the new build:
+
+```bash
+kyorouter --tray
+```
+
+> `update-global.bat` / `update.sh` in the repo provide the same manual flow (pull → build → install) if you prefer running it by hand instead of the `kyorouter update` command.
 
 ### Requirements
 
