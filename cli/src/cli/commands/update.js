@@ -2,7 +2,7 @@
 // `kyorouter update` — pull the latest from GitHub, rebuild, and reinstall the
 // global package. Run from anywhere: it clones into the app-data dir so it
 // never touches a local dev folder.
-const { spawnSync } = require("child_process");
+const { spawnSync, execSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -18,6 +18,27 @@ function appDataDir() {
 
 function step(msg) {
   console.log(`\n\x1b[36m==\x1b[0m ${msg}`);
+}
+
+// Stop any process listening on `port` (best effort, Windows + POSIX).
+function killPort(port) {
+  try {
+    if (process.platform === "win32") {
+      const out = execSync(`netstat -ano | findstr ":${port}" | findstr LISTENING`, { encoding: "utf8", windowsHide: true });
+      const pids = new Set();
+      for (const line of out.split("\n")) {
+        const m = line.trim().match(/\s+(\d+)\s*$/);
+        if (m) pids.add(m[1]);
+      }
+      for (const pid of pids) {
+        try { execSync(`taskkill /F /T /PID ${pid}`, { stdio: "ignore", windowsHide: true }); console.log(`   Stopped gateway (PID ${pid})`); }
+        catch { }
+      }
+    } else {
+      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`);
+      console.log(`   Stopped gateway on port ${port}`);
+    }
+  } catch { /* no listener — fine */ }
 }
 
 function exec(cmd, args, opts = {}) {
@@ -71,8 +92,10 @@ function run(args) {
     exec("npm", ["run", "build"], { cwd: workDir });
     exec("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
 
+    step("Stopping running gateway (port 20128) before deploying...");
+    killPort(20128);
+
     step("Deploying build to the running installation (clone dir)");
-    // The "global" installation is the CLI this command runs from (argv[1]),
     // e.g. C:\Users\kikir\kyorouter\cli. Replace its app/ build with the freshly
     // built one so a gateway restart picks up the new code. cli/app is a build
     // artifact, so this never destroys source.
@@ -92,8 +115,8 @@ function run(args) {
 \x1b[32m==========================================\x1b[0m
   Update complete!
   - Latest from GitHub: ${REPO}
-  - Global package reinstalled (free-standing copy)
-  - Restart the gateway to use the new build: kill it and run "kyorouter --tray"
+  - App deployed to the running installation
+  - Restart the gateway to use the new build: run "kyorouter --tray -p 20128"
 \x1b[32m==========================================\x1b[0m`);
     return 0;
   } catch (e) {

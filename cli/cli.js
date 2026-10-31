@@ -85,13 +85,7 @@ if (args[0] === "xai" && args[1] === "video") {
 // into the app-data dir, never touching a local dev folder.
 if (args[0] === "update") {
   const { run } = require("./src/cli/commands/update");
-  run(args.slice(1))
-    .then((code) => process.exit(code))
-    .catch((err) => {
-      console.error(`❌ ${err?.message || err}`);
-      process.exit(1);
-    });
-  return;
+  process.exit(run(args.slice(1)));
 }
 
 // `kyorouter connect <url>` configures local CLI tools against a remote server, and
