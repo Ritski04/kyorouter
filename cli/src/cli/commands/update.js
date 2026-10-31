@@ -9,7 +9,6 @@ const path = require("path");
 
 const REPO = "https://github.com/Ritski04/kyorouter.git";
 const BRANCH = "main";
-const APP_NAME = "kyorouter";
 
 function appDataDir() {
   return process.platform === "win32"
@@ -39,6 +38,9 @@ function exec(cmd, args, opts = {}) {
 }
 
 let workDir = path.join(appDataDir(), "update-src");
+// Directory of THIS CLI package (where update.js lives), i.e. the clone's cli/
+// (e.g. C:\Users\kikir\kyorouter\cli) — vs a dev project checkout.
+const cliDir = path.resolve(__dirname, "..", "..", "..");
 
 function ensureDeps() {
   // Fresh clone has no node_modules (repo does not track deps). Install
@@ -69,9 +71,22 @@ function run(args) {
     exec("npm", ["run", "build"], { cwd: workDir });
     exec("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
 
-    step("Reinstalling global package (breaks npm hardlink, fetch is fine)");
-    exec("npm", ["uninstall", "-g", APP_NAME], { stdio: "ignore" });
-    exec("npm", ["install", "-g", "."], { cwd: path.join(workDir, "cli") });
+    step("Deploying build to the running installation (clone dir)");
+    // The "global" installation is the CLI this command runs from (argv[1]),
+    // e.g. C:\Users\kikir\kyorouter\cli. Replace its app/ build with the freshly
+    // built one so a gateway restart picks up the new code. cli/app is a build
+    // artifact, so this never destroys source.
+    const runningCliDir = path.dirname(process.argv[1] || __filename);
+    const targetApp = path.join(runningCliDir, "app");
+    const builtApp = path.join(workDir, "cli", "app");
+    if (fs.existsSync(targetApp)) {
+      console.log(`   Replacing ${targetApp}`);
+      fs.rmSync(targetApp, { recursive: true, force: true });
+      fs.cpSync(builtApp, targetApp, { recursive: true });
+      console.log(`   Deployed app → ${targetApp}`);
+    } else {
+      console.log(`   ⚠️  No existing app at ${targetApp} — skipped deploy`);
+    }
 
     console.log(`
 \x1b[32m==========================================\x1b[0m
