@@ -22,9 +22,16 @@ function step(msg) {
 }
 
 function run(cmd, args, opts = {}) {
-  // On Windows npm is npm.cmd — spawnSync can't exec a bare .cmd name.
-  const resolved = process.platform === "win32" && cmd === "npm" ? "npm.cmd" : cmd;
-  const res = spawnSync(resolved, args, { stdio: "inherit", ...opts });
+  // On Windows npm is npm.cmd and spawnSync can't exec it without a shell
+  // (ESWIN/ENOENT + "spawnSync npm.cmd EINVAL"). Resolve to npm.cmd and run
+  // it through the shell, quoting args so paths with spaces survive.
+  const isWin = process.platform === "win32";
+  const resolved = isWin && cmd === "npm" ? "npm.cmd" : cmd;
+  const res = spawnSync(resolved, args, {
+    stdio: "inherit",
+    shell: isWin,
+    ...opts,
+  });
   if (res.status !== 0) {
     console.error(`\n❌ Command failed: ${cmd} ${args.join(" ")}`);
     process.exit(res.status || 1);
@@ -44,35 +51,40 @@ function ensureDeps() {
   run("npm", ["install", "--no-audit", "--no-fund"], { cwd: path.join(workDir, "cli") });
 }
 
-try {
-  if (!fs.existsSync(workDir)) {
-    step("Cloning kyorouter from GitHub");
-    run("git", ["clone", "--depth", "1", "--branch", BRANCH, REPO, workDir]);
-  } else {
-    step("Pulling latest from GitHub");
-    run("git", ["-C", workDir, "fetch", "origin", BRANCH]);
-    run("git", ["-C", workDir, "reset", "--hard", `origin/${BRANCH}`]);
-  }
+function run(args) {
+  // args unused by update currently — kept for signature parity.
+  try {
+    if (!fs.existsSync(workDir)) {
+      step("Cloning kyorouter from GitHub");
+      run("git", ["clone", "--depth", "1", "--branch", BRANCH, REPO, workDir]);
+    } else {
+      step("Pulling latest from GitHub");
+      run("git", ["-C", workDir, "fetch", "origin", BRANCH]);
+      run("git", ["-C", workDir, "reset", "--hard", `origin/${BRANCH}`]);
+    }
 
-  ensureDeps();
+    ensureDeps();
 
-  step("Building the app + CLI (this takes a minute)");
-  run("npm", ["run", "build"], { cwd: workDir });
-  run("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
+    step("Building the app + CLI (this takes a minute)");
+    run("npm", ["run", "build"], { cwd: workDir });
+    run("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
 
-  step("Reinstalling global package (breaks npm hardlink, fetch is fine)");
-  run("npm", ["uninstall", "-g", APP_NAME], { stdio: "ignore" });
-  run("npm", ["install", "-g", "."], { cwd: path.join(workDir, "cli") });
+    step("Reinstalling global package (breaks npm hardlink, fetch is fine)");
+    run("npm", ["uninstall", "-g", APP_NAME], { stdio: "ignore" });
+    run("npm", ["install", "-g", "."], { cwd: path.join(workDir, "cli") });
 
-  console.log(`
+    console.log(`
 \x1b[32m==========================================\x1b[0m
   Update complete!
   - Latest from GitHub: ${REPO}
   - Global package reinstalled (free-standing copy)
   - Restart the gateway to use the new build: kill it and run "kyorouter --tray"
 \x1b[32m==========================================\x1b[0m`);
-  process.exit(0);
-} catch (e) {
-  console.error(`\n❌ Update failed: ${e?.message || e}`);
-  process.exit(1);
+    return 0;
+  } catch (e) {
+    console.error(`\n❌ Update failed: ${e?.message || e}`);
+    return 1;
+  }
 }
+
+module.exports = { run };
