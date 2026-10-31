@@ -32,18 +32,14 @@ function run(cmd, args, opts = {}) {
 let workDir = path.join(appDataDir(), "update-src");
 
 function ensureDeps() {
-  // Fresh clone has no node_modules (repo outdoes not track deps). Install
+  // Fresh clone has no node_modules (repo does not track deps). Install
   // root + cli deps before building. Reuses cache, so repeats are quick.
-  const rootM = path.join(workDir, "node_modules");
-  const cliM = path.join(workDir, "cli", "node_modules");
-  if (!fs.existsSync(rootM)) {
-    step("Installing root dependencies");
-    run("npm", ["install"], { cwd: workDir });
-  }
-  if (!fs.existsSync(cliM)) {
-    step("Installing CLI dependencies");
-    run("npm", ["install"], { cwd: path.join(workDir, "cli") });
-  }
+  // Always run npm install (not only when node_modules is missing): after a
+  // `git reset --hard` the lockfile may list deps not yet present locally.
+  step("Installing root dependencies");
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: workDir });
+  step("Installing CLI dependencies");
+  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: path.join(workDir, "cli") });
 }
 
 try {
