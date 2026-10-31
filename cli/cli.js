@@ -95,7 +95,7 @@ if (args[0] === "install") {
   process.exit(run(args.slice(1)));
 }
 
-// `9router connect <url>` configures local CLI tools against a remote server, and
+// `kyorouter connect <url>` configures local CLI tools against a remote server, and
 // `kyorouter show` prints what they're currently set to — no local server, no
 // runtime deps. Usable via `npx kyorouter …`.
 if (args[0] === "connect" || args[0] === "show") {
@@ -141,7 +141,7 @@ function getDisplayHost() {
 const MAX_PORT_ATTEMPTS = 10;
 // Identifiers for killAllAppProcesses - only kill kyorouter specifically
 const PROCESS_IDENTIFIERS = [
-  'kyorouter', '9router'  // Only package name - avoid killing other apps
+  'kyorouter', 'kyorouter'  // Only package name - avoid killing other apps
 ];
 
 // Parse arguments
@@ -310,12 +310,12 @@ function killAllAppProcesses(appPort) {
           });
           const lines = output.split("\n").slice(1).filter(l => l.trim());
           lines.forEach(line => {
-            // Whitelist: real node process running kyorouter (or legacy 9router)
+            // Whitelist: real node process running kyorouter (or legacy kyorouter)
             // cli.js, or next-server. Avoids killing editors/grep/strace/cursor
             // that just have the name in cmdline.
             const cmd = line.toLowerCase();
             const isAppProcess =
-              (cmd.includes("node") && (cmd.includes("kyorouter") || cmd.includes("9router")) && (cmd.includes("cli.js") || cmd.includes("\\kyorouter") || cmd.includes("/kyorouter") || cmd.includes("\\9router") || cmd.includes("/9router")))
+              (cmd.includes("node") && (cmd.includes("kyorouter") || cmd.includes("kyorouter")) && (cmd.includes("cli.js") || cmd.includes("\\kyorouter") || cmd.includes("/kyorouter") || cmd.includes("\\kyorouter") || cmd.includes("/kyorouter")))
               || cmd.includes("next-server");
             if (isAppProcess) {
               const match = line.match(/^"(\d+)"/);
@@ -337,12 +337,12 @@ function killAllAppProcesses(appPort) {
           const lines = output.split('\n');
 
           lines.forEach(line => {
-            // Whitelist: real node process running kyorouter (or legacy 9router)
+            // Whitelist: real node process running kyorouter (or legacy kyorouter)
             // cli.js, or next-server. Avoids killing grep/strace/editors/cursor
             // that incidentally match the name.
             const cmd = line.toLowerCase();
             const isAppProcess =
-              (cmd.includes("node") && (cmd.includes("kyorouter") || cmd.includes("9router")) && (cmd.includes("cli.js") || cmd.includes("/kyorouter") || cmd.includes("/9router")))
+              (cmd.includes("node") && (cmd.includes("kyorouter") || cmd.includes("kyorouter")) && (cmd.includes("cli.js") || cmd.includes("/kyorouter") || cmd.includes("/kyorouter")))
               || cmd.includes("next-server");
             if (isAppProcess) {
               const parts = line.trim().split(/\s+/);

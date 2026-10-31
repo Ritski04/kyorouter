@@ -82,7 +82,7 @@ const createOpenAIModelsConfig = (url) => ({
 const normalizeRoutedNousModels = (data) => normalizeNousModels(data).map((model) => ({
   ...model,
   // Live upstream IDs include a vendor namespace (for example,
-  // stepfun/step-5-preview:free). Prefix the owning 9router provider so Basic
+  // stepfun/step-5-preview:free). Prefix the owning kyorouter provider so Basic
   // Chat does not parse that namespace as the provider itself.
   id: `nous/${model.id}`,
   upstreamModelId: model.id,

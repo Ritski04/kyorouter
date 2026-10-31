@@ -1,0 +1,14 @@
+=== KyoRouter Update start 31/10/2026  3:51:23,12 === 
+[5/6] npm uninstall -g + install -g . --force 
+
+removed 1 package in 1s
+npm warn using --force Recommended protections disabled.
+
+added 1 package in 942ms
+global install exit=0 
+[6/6] starting kyorouter --tray -p 20128 
+=== update DONE === 
+fatal: not a git repository (or any of the parent directories): .git
+fetch exit=128 
+fatal: not a git repository (or any of the parent directories): .git
+pull exit=128 

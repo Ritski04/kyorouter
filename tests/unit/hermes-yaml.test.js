@@ -14,13 +14,13 @@ import {
   removeAuxRole,
   upsertEnvVar,
   removeEnvVar,
-  has9RouterConfig,
+  haskyorouterConfig,
   isCustomBlock,
   parseSttBlock,
-  is9RouterStt,
+  iskyorouterStt,
   buildSttBlock,
-  upsertStt9Router,
-  removeStt9Router,
+  upsertSttkyorouter,
+  removeSttkyorouter,
 } from "../../src/app/api/cli-tools/hermes-settings/hermesYaml.js";
 
 const BASE = "http://127.0.0.1:20128/v1";
@@ -129,7 +129,7 @@ describe("hermes config.yaml helpers", () => {
     });
   });
 
-  describe("stt block (audio transcription via 9router)", () => {
+  describe("stt block (audio transcription via kyorouter)", () => {
     const OTHER_SETTINGS = `stt:\n  enabled: true\n  language: "id"\n  echo_transcripts: false\n  local:\n    model: base\n    auto_install: false\n`;
 
     it("builds a provider-qualified wiring block", () => {
@@ -149,12 +149,12 @@ describe("hermes config.yaml helpers", () => {
         base_url: BASE,
         api_key: "${OPENAI_API_KEY}",
       });
-      expect(is9RouterStt(parsed)).toBe(true);
+      expect(iskyorouterStt(parsed)).toBe(true);
     });
 
     it("returns null when there is no stt section", () => {
       expect(parseSttBlock(FRESH_INSTALL)).toBeNull();
-      expect(is9RouterStt(null)).toBe(false);
+      expect(iskyorouterStt(null)).toBe(false);
     });
 
     it("does not claim a foreign STT setup as ours", () => {
@@ -162,14 +162,14 @@ describe("hermes config.yaml helpers", () => {
       expect(parsed).toMatchObject({ provider: null, model: null });
       // openai provider but the user's own key — not our wiring
       const own = parseSttBlock(`stt:\n  provider: "openai"\n  openai:\n    base_url: "https://api.openai.com/v1"\n    api_key: sk-user\n`);
-      expect(is9RouterStt(own)).toBe(false);
+      expect(iskyorouterStt(own)).toBe(false);
       // our api_key reference but a different backend
       const local = parseSttBlock(`stt:\n  provider: "local"\n  openai:\n    api_key: \${OPENAI_API_KEY}\n`);
-      expect(is9RouterStt(local)).toBe(false);
+      expect(iskyorouterStt(local)).toBe(false);
     });
 
     it("upserts onto a fresh file", () => {
-      const out = upsertStt9Router(FRESH_INSTALL, "groq/whisper-large-v3", BASE);
+      const out = upsertSttkyorouter(FRESH_INSTALL, "groq/whisper-large-v3", BASE);
       expect(out.match(/^stt:/gm)).toHaveLength(1);
       expect(parseSttBlock(out)).toMatchObject({ provider: "openai", model: "groq/whisper-large-v3", base_url: BASE });
       // untouched siblings survive
@@ -178,7 +178,7 @@ describe("hermes config.yaml helpers", () => {
     });
 
     it("preserves the user's other stt settings and never touches stt.local.model", () => {
-      let yaml = upsertStt9Router(OTHER_SETTINGS, "selfhosted-stt/whisper-1", "http://127.0.0.1:8080/v1");
+      let yaml = upsertSttkyorouter(OTHER_SETTINGS, "selfhosted-stt/whisper-1", "http://127.0.0.1:8080/v1");
       const parsed = parseSttBlock(yaml);
       expect(parsed).toMatchObject({ provider: "openai", model: "selfhosted-stt/whisper-1" });
       expect(yaml).toContain('language: "id"');
@@ -188,22 +188,22 @@ describe("hermes config.yaml helpers", () => {
       expect(yaml.match(/^ {4}model: "/gm)).toHaveLength(1); // openai model quoted once, local untouched
 
       // re-apply with a new endpoint/model stays idempotent
-      yaml = upsertStt9Router(yaml, "groq/whisper-large-v3", BASE);
+      yaml = upsertSttkyorouter(yaml, "groq/whisper-large-v3", BASE);
       expect(parseSttBlock(yaml).model).toBe("groq/whisper-large-v3");
       expect(yaml.match(/^stt:/gm)).toHaveLength(1);
       expect(yaml).toContain("model: base");
     });
 
     it("creates the openai sub-block inside an existing stt section", () => {
-      const yaml = upsertStt9Router(`stt:\n  enabled: true\n  language: "en"\n`, "groq/whisper-large-v3", BASE);
+      const yaml = upsertSttkyorouter(`stt:\n  enabled: true\n  language: "en"\n`, "groq/whisper-large-v3", BASE);
       expect(parseSttBlock(yaml)).toMatchObject({ model: "groq/whisper-large-v3", base_url: BASE });
       expect(yaml).toContain('language: "en"');
     });
 
     it("removes exactly the wiring it wrote, keeping foreign settings", () => {
-      const yaml = upsertStt9Router(OTHER_SETTINGS, "groq/whisper-large-v3", BASE);
-      const out = removeStt9Router(yaml);
-      expect(is9RouterStt(parseSttBlock(out))).toBe(false);
+      const yaml = upsertSttkyorouter(OTHER_SETTINGS, "groq/whisper-large-v3", BASE);
+      const out = removeSttkyorouter(yaml);
+      expect(iskyorouterStt(parseSttBlock(out))).toBe(false);
       expect(out).not.toContain("whisper-large-v3");
       expect(out).not.toContain(BASE);
       expect(out).not.toContain("${OPENAI_API_KEY}");
@@ -216,15 +216,15 @@ describe("hermes config.yaml helpers", () => {
     });
 
     it("drops the whole block when it only ever contained our keys", () => {
-      const out = removeStt9Router(upsertStt9Router(FRESH_INSTALL, "groq/whisper-large-v3", BASE));
+      const out = removeSttkyorouter(upsertSttkyorouter(FRESH_INSTALL, "groq/whisper-large-v3", BASE));
       expect(out).not.toContain("stt:");
       expect(out).toContain("reasoning_effort: medium");
     });
 
     it("is a no-op on files without stt or with a foreign provider", () => {
-      expect(removeStt9Router(FRESH_INSTALL)).toBe(FRESH_INSTALL);
+      expect(removeSttkyorouter(FRESH_INSTALL)).toBe(FRESH_INSTALL);
       const foreign = `stt:\n  language: "id"\n  local:\n    model: base\n`;
-      expect(removeStt9Router(foreign)).toBe(foreign);
+      expect(removeSttkyorouter(foreign)).toBe(foreign);
     });
   });
 
@@ -245,16 +245,16 @@ describe("hermes config.yaml helpers", () => {
     });
   });
 
-  describe("9router detection", () => {
-    it("recognises a local 9router endpoint", () => {
-      expect(has9RouterConfig({ provider: "custom", base_url: "http://127.0.0.1:20128/v1" })).toBe(true);
-      expect(has9RouterConfig({ provider: "custom", base_url: "http://localhost:20128/v1" })).toBe(true);
+  describe("kyorouter detection", () => {
+    it("recognises a local kyorouter endpoint", () => {
+      expect(haskyorouterConfig({ provider: "custom", base_url: "http://127.0.0.1:20128/v1" })).toBe(true);
+      expect(haskyorouterConfig({ provider: "custom", base_url: "http://localhost:20128/v1" })).toBe(true);
     });
 
     it("rejects other providers or endpoints", () => {
-      expect(has9RouterConfig({ provider: "openrouter", base_url: "http://127.0.0.1:1/v1" })).toBe(false);
-      expect(has9RouterConfig({ provider: "custom", base_url: "https://abc.ngrok.app/v1" })).toBe(false);
-      expect(has9RouterConfig(null)).toBe(false);
+      expect(haskyorouterConfig({ provider: "openrouter", base_url: "http://127.0.0.1:1/v1" })).toBe(false);
+      expect(haskyorouterConfig({ provider: "custom", base_url: "https://abc.ngrok.app/v1" })).toBe(false);
+      expect(haskyorouterConfig(null)).toBe(false);
     });
 
     it("classifies custom-provider blocks (incl. tunnel endpoints)", () => {
