@@ -85,14 +85,31 @@ if (args[0] === "xai" && args[1] === "video") {
 // into the app-data dir, never touching a local dev folder.
 if (args[0] === "update") {
   const { run } = require("./src/cli/commands/update");
-  process.exit(run(args.slice(1)));
+  const result = run(args.slice(1));
+  // run() returns a plain integer (sync); guard against old builds that returned a Promise
+  if (result && typeof result.then === "function") {
+    result.then((code) => process.exit(code)).catch((err) => {
+      console.error(`❌ ${err?.message || err}`);
+      process.exit(1);
+    });
+  } else {
+    process.exit(result || 0);
+  }
 }
 
 // `kyorouter install` bootstraps a machine: clones/builds into APP_DATA and
 // writes the `kyorouter` shims so the command works from anywhere.
 if (args[0] === "install") {
   const { run } = require("./src/cli/commands/install");
-  process.exit(run(args.slice(1)));
+  const result = run(args.slice(1));
+  if (result && typeof result.then === "function") {
+    result.then((code) => process.exit(code)).catch((err) => {
+      console.error(`❌ ${err?.message || err}`);
+      process.exit(1);
+    });
+  } else {
+    process.exit(result || 0);
+  }
 }
 
 // `kyorouter connect <url>` configures local CLI tools against a remote server, and
