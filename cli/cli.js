@@ -88,7 +88,14 @@ if (args[0] === "update") {
   process.exit(run(args.slice(1)));
 }
 
-// `kyorouter connect <url>` configures local CLI tools against a remote server, and
+// `kyorouter install` bootstraps a machine: clones/builds into APP_DATA and
+// writes the `kyorouter` shims so the command works from anywhere.
+if (args[0] === "install") {
+  const { run } = require("./src/cli/commands/install");
+  process.exit(run(args.slice(1)));
+}
+
+// `9router connect <url>` configures local CLI tools against a remote server, and
 // `kyorouter show` prints what they're currently set to — no local server, no
 // runtime deps. Usable via `npx kyorouter …`.
 if (args[0] === "connect" || args[0] === "show") {
@@ -182,6 +189,8 @@ Commands:
                       (e.g. kyorouter show claude)
   update              Pull latest from GitHub, rebuild, and reinstall the
                       global package (run from anywhere: kyorouter update)
+  install             Bootstrap install: clone/build into APP_DATA, write
+                      shims (run from a fresh clone: node cli.js install)
   xai video --prompt "..." --output video.mp4
                       Generate a Grok Imagine video via the running gateway
                       (see: ${APP_NAME} xai video --help)

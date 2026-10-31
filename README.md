@@ -48,10 +48,10 @@ KyoRouter is a high-performance API routing solution optimized for developers ma
 
 ### Installation
 
-KyoRouter is not published to the public npm registry, so install it from source (GitHub):
+KyoRouter is not published to the public npm registry, so install it from source (GitHub). The install is self-contained: it builds into `%APPDATA%\kyorouter\cli` (Windows) or `~/.kyorouter/cli` and sets up the `kyorouter` command so it works from anywhere.
 
 ```bash
-# clone the repo
+# clone the repo (anywhere — a temporary folder is fine)
 git clone https://github.com/Ritski04/kyorouter.git
 cd kyorouter/cli
 
@@ -59,8 +59,8 @@ cd kyorouter/cli
 npm install
 npm run build
 
-# install as a global command
-npm install -g .
+# bootstrap install: deploys to APP_DATA + writes the command shims
+node cli.js install
 ```
 
 ### Start Server
@@ -106,30 +106,32 @@ npm install
 npm run build
 ```
 
-### Install as Global Command
+### Bootstrap Install (Recommended)
 
-From the `cli/` folder, link it so `kyorouter` works anywhere:
+From the `cli/` folder, run the self-contained installer. It builds into the per-user data dir (`%APPDATA%\kyorouter\cli` on Windows, `~/.kyorouter/cli` elsewhere), writes the `kyorouter` command shims, and sets everything up:
 
 ```bash
 cd kyorouter/cli
-npm install -g .
+node cli.js install
 ```
+
+After this, `kyorouter` works from anywhere — run `kyorouter` to start the gateway.
 
 ### Updating a Global Install
 
-Once the global package is installed, update it from anywhere — no clone, no scripts:
+Once installed, update it from anywhere — no clone, no scripts:
 
 ```bash
 kyorouter update
 ```
 
-This pulls the latest source from GitHub (`Ritski04/kyorouter`), rebuilds the app + CLI into a temp folder, and reinstalls the global package. Restart the gateway afterwards to run the new build:
+This pulls the latest source from GitHub (`Ritski04/kyorouter`), rebuilds the app + CLI into `%APPDATA%\kyorouter\update-src`, stops the running gateway on port 20128, and deploys the fresh build to `%APPDATA%\kyorouter\cli\app`. Restart the gateway afterwards to run the new build:
 
 ```bash
-kyorouter --tray
+kyorouter --tray -p 20128
 ```
 
-> `update-global.bat` / `update.sh` in the repo provide the same manual flow (pull → build → install) if you prefer running it by hand instead of the `kyorouter update` command.
+> `update-global.bat` / `update.sh` in the repo provide the same manual flow (pull → build → deploy) if you prefer running it by hand instead of `kyorouter update`.
 
 ### Requirements
 
