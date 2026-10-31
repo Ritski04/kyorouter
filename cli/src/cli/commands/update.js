@@ -21,7 +21,7 @@ function step(msg) {
   console.log(`\n\x1b[36m==\x1b[0m ${msg}`);
 }
 
-function run(cmd, args, opts = {}) {
+function exec(cmd, args, opts = {}) {
   // On Windows npm is npm.cmd and spawnSync can't exec it without a shell
   // (ESWIN/ENOENT + "spawnSync npm.cmd EINVAL"). Resolve to npm.cmd and run
   // it through the shell, quoting args so paths with spaces survive.
@@ -46,9 +46,9 @@ function ensureDeps() {
   // Always run npm install (not only when node_modules is missing): after a
   // `git reset --hard` the lockfile may list deps not yet present locally.
   step("Installing root dependencies");
-  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: workDir });
+  exec("npm", ["install", "--no-audit", "--no-fund"], { cwd: workDir });
   step("Installing CLI dependencies");
-  run("npm", ["install", "--no-audit", "--no-fund"], { cwd: path.join(workDir, "cli") });
+  exec("npm", ["install", "--no-audit", "--no-fund"], { cwd: path.join(workDir, "cli") });
 }
 
 function run(args) {
@@ -56,22 +56,22 @@ function run(args) {
   try {
     if (!fs.existsSync(workDir)) {
       step("Cloning kyorouter from GitHub");
-      run("git", ["clone", "--depth", "1", "--branch", BRANCH, REPO, workDir]);
+      exec("git", ["clone", "--depth", "1", "--branch", BRANCH, REPO, workDir]);
     } else {
       step("Pulling latest from GitHub");
-      run("git", ["-C", workDir, "fetch", "origin", BRANCH]);
-      run("git", ["-C", workDir, "reset", "--hard", `origin/${BRANCH}`]);
+      exec("git", ["-C", workDir, "fetch", "origin", BRANCH]);
+      exec("git", ["-C", workDir, "reset", "--hard", `origin/${BRANCH}`]);
     }
 
     ensureDeps();
 
     step("Building the app + CLI (this takes a minute)");
-    run("npm", ["run", "build"], { cwd: workDir });
-    run("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
+    exec("npm", ["run", "build"], { cwd: workDir });
+    exec("npm", ["run", "build"], { cwd: path.join(workDir, "cli") });
 
     step("Reinstalling global package (breaks npm hardlink, fetch is fine)");
-    run("npm", ["uninstall", "-g", APP_NAME], { stdio: "ignore" });
-    run("npm", ["install", "-g", "."], { cwd: path.join(workDir, "cli") });
+    exec("npm", ["uninstall", "-g", APP_NAME], { stdio: "ignore" });
+    exec("npm", ["install", "-g", "."], { cwd: path.join(workDir, "cli") });
 
     console.log(`
 \x1b[32m==========================================\x1b[0m
