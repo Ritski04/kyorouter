@@ -22,7 +22,9 @@ function step(msg) {
 }
 
 function run(cmd, args, opts = {}) {
-  const res = spawnSync(cmd, args, { stdio: "inherit", ...opts });
+  // On Windows npm is npm.cmd — spawnSync can't exec a bare .cmd name.
+  const resolved = process.platform === "win32" && cmd === "npm" ? "npm.cmd" : cmd;
+  const res = spawnSync(resolved, args, { stdio: "inherit", ...opts });
   if (res.status !== 0) {
     console.error(`\n❌ Command failed: ${cmd} ${args.join(" ")}`);
     process.exit(res.status || 1);
