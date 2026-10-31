@@ -2,7 +2,7 @@
 
 > Self-hosted API Router with Smart Quota Management
 
-KyoRouter is a high-performance API routing solution optimized for developers managing multiple AI providers. Built for flexibility and control with persistent quota tracking, intelligent request routing, and zero vendor lock-in.
+KyoRouter is a self-hosted gateway that sits in front of your AI providers. It unifies multiple API keys under one OpenAI-compatible endpoint, tracks quota in real-time, and routes requests intelligently — so your tools never need to know which provider is behind the curtain.
 
 ![Version](https://img.shields.io/badge/version-0.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -13,254 +13,209 @@ KyoRouter is a high-performance API routing solution optimized for developers ma
 ## ✨ Features
 
 ### Core Routing
-- 🔀 **Multi-provider support** — OpenAI-compatible APIs with automatic fallback
-- ⚖️ **Load balancing** — Distribute requests across multiple keys
-- 🎯 **Smart routing** — Priority-based provider selection
-- 🔄 **Auto-retry** — Automatic failover on errors
+- 🔀 **Multi-provider support** — OpenAI-compatible endpoint across any provider
+- ⚖️ **Load balancing** — Spread requests across multiple keys automatically
+- 🎯 **Smart routing** — Priority-based provider selection per combo
+- 🔄 **Auto-retry** — Automatic failover when a provider errors
 
 ### Quota Management
-- 📊 **Persistent tracking** — SQLite-backed quota cache (survives restarts)
-- 🎨 **Visual dashboard** — Progress bars, usage stats, token metrics
-- 🔔 **Smart refresh** — Auto-update only recently accessed providers
-- 📈 **Usage analytics** — Daily/historical token consumption
-
-### Performance
-- ⚡ **Batch operations** — Efficient updates for 1000+ keys
-- 💾 **Intelligent caching** — 60s in-memory + 7-day SQLite persistence
-- 🚀 **Sequential probing** — 50ms delay prevents rate limits
-- 🎯 **Optimized UI** — Smooth rendering with batched state updates
-
-### Developer Experience
-- 🖥️ **Web dashboard** — Modern dark-themed UI
-- 🛠️ **CLI tools** — Command-line management
-- 📝 **Request logging** — Debug and monitor API calls
-- 🔧 **Flexible config** — JSON-based provider setup
+- 📊 **Persistent tracking** — SQLite-backed quota cache that survives restarts
+- 🎨 **Visual dashboard** — Progress bars, usage stats, token metrics per provider
+- 🔔 **Smart refresh** — Only polls providers accessed in the last 10 minutes
+- ⚡ **Batch operations** — Handles 1000+ keys without UI jitter
 
 ### Prompt Injection
-- 💉 **Per-combo prompts** — Inject a system prompt on every request routed through a combo
-- 🎯 **Per-model prompts** — Set prompts directly on individual models (wins over combo prompts)
-- 🧩 **Additive layering** — Model/combo prompts stack on top of the global Token Saver prompt
-- 📚 **Reusable templates** — Save custom prompt templates and reuse them across combos/models
+- 💉 **Per-combo prompts** — Inject a system prompt on every request through a combo
+- 🎯 **Per-model prompts** — Override at the model level (takes priority over combo)
+- 🧩 **Additive layering** — Stacks on top of the global Token Saver prompt, never replacing it
+- 📚 **Reusable templates** — Save prompts as templates and reuse them across combos/models
+
+### Developer Experience
+- 🖥️ **Web dashboard** — Dark-themed UI, works in any browser
+- 🛠️ **Interactive CLI** — Terminal UI for managing tools, combos, and connections
+- 📝 **Request logging** — Debug and monitor API calls in real-time
+- 🔧 **CLI tool integration** — One command to point Claude Code, Codex, Cursor, and others at your gateway
 
 ---
 
 ## 🚀 Quick Start
 
-### Installation
+> KyoRouter is **not on the public npm registry** — `npm install -g kyorouter` will not work. Install from GitHub.
 
-KyoRouter is not published to the public npm registry, so install it from source (GitHub). The install is self-contained: it builds into `%APPDATA%\kyorouter\cli` (Windows) or `~/.kyorouter/cli` and sets up the `kyorouter` command so it works from anywhere.
+### 1. Clone & Build
 
 ```bash
-# clone the repo (anywhere — a temporary folder is fine)
 git clone https://github.com/Ritski04/kyorouter.git
 cd kyorouter/cli
-
-# install dependencies & build
 npm install
 npm run build
+```
 
-# bootstrap install: deploys to APP_DATA + writes the command shims
+### 2. Install
+
+```bash
 node cli.js install
 ```
 
-### Start Server
+This deploys the CLI to `%APPDATA%\kyorouter\cli` (Windows) or `~/.kyorouter/cli` (Linux/macOS) and writes the `kyorouter` command so it works from anywhere. The clone folder can be deleted afterwards.
+
+### 3. Start the Gateway
 
 ```bash
 kyorouter
 ```
 
-The dashboard will open at `http://localhost:20128`
-
-### Basic Usage
-
-1. **Add Provider** — Configure your AI provider credentials
-2. **Create Endpoint** — Generate your unified API endpoint
-3. **Start Routing** — Use the endpoint in your applications
-
-```bash
-# Example: Use KyoRouter as OpenAI proxy
-curl http://localhost:20128/v1/chat/completions \
-  -H "Authorization: Bearer YOUR_KYOROUTER_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-4",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
+Dashboard opens at `http://localhost:20128`. Change the port with `-p <port>`.
 
 ---
 
-## 📦 Installation Options
+## 🔄 Updating
 
-### From Source (Recommended)
-
-> KyoRouter is **not published to the public npm registry** — `npm install -g kyorouter` will **not** work. Install from GitHub instead.
-
-```bash
-git clone https://github.com/Ritski04/kyorouter.git
-cd kyorouter
-npm install
-npm run build
-cd cli
-npm install
-npm run build
-```
-
-### Bootstrap Install (Recommended)
-
-From the `cli/` folder, run the self-contained installer. It builds into the per-user data dir (`%APPDATA%\kyorouter\cli` on Windows, `~/.kyorouter/cli` elsewhere), writes the `kyorouter` command shims, and sets everything up:
-
-```bash
-cd kyorouter/cli
-node cli.js install
-```
-
-After this, `kyorouter` works from anywhere — run `kyorouter` to start the gateway.
-
-### Updating a Global Install
-
-Once installed, update it from anywhere — no clone, no scripts:
+Once installed, update from anywhere — no clone needed:
 
 ```bash
 kyorouter update
 ```
 
-This pulls the latest source from GitHub (`Ritski04/kyorouter`), rebuilds the app + CLI into `%APPDATA%\kyorouter\update-src`, stops the running gateway on port 20128, and deploys the fresh build to `%APPDATA%\kyorouter\cli\app`. Restart the gateway afterwards to run the new build:
+This pulls the latest source from GitHub, rebuilds the app + CLI under `%APPDATA%\kyorouter\update-src`, and deploys the fresh build to `%APPDATA%\kyorouter\cli`. Restart the gateway manually to apply the new build:
 
 ```bash
 kyorouter --tray -p 20128
 ```
 
-> `update-global.bat` / `update.sh` in the repo provide the same manual flow (pull → build → deploy) if you prefer running it by hand instead of `kyorouter update`.
-
-### Requirements
-
-- Node.js >= 18.0.0
-- npm or yarn
-- 200MB free disk space
+> Alternatively, run `update-global.bat` (Windows) or `update.sh` (Linux/macOS) from the repo for the same flow.
 
 ---
 
-## 🎯 Use Cases
+## 🔌 Connecting CLI Tools
 
-### Multi-Provider Management
-Manage dozens of API keys across multiple providers with unified quota tracking and automatic load balancing.
+Point your local AI coding tools at KyoRouter with one command:
 
-### Cost Optimization
-Track token usage in real-time, identify expensive requests, and optimize spending across providers.
+```bash
+kyorouter connect http://<your-server>:20128
+```
 
-### Development & Testing
-Test applications against multiple AI providers without changing code. Switch providers with configuration changes only.
+Supported tools: **Claude Code**, **Codex**, **Cursor**, **Opencode**, **Droid**, **Crush**, **Kilo**, **Forge**, **Smelt**, and more.
 
-### High Availability
-Automatic failover ensures your application keeps running even when individual providers experience downtime.
+```bash
+# connect specific tools only
+kyorouter connect http://localhost:20128 --tools claude,codex
+
+# check current config for all tools
+kyorouter show
+
+# remove KyoRouter settings from tools
+kyorouter connect --reset --tools claude,codex
+```
+
+Run `kyorouter connect --help` for the full list of options.
 
 ---
 
 ## 🛠️ Configuration
 
-### Provider Setup
+### Adding a Provider
 
-Navigate to **Dashboard → Providers** and add your API credentials:
+Go to **Dashboard → Providers → Add Provider**:
 
-```json
-{
-  "name": "OpenAI Primary",
-  "baseUrl": "https://api.openai.com/v1",
-  "apiKey": "sk-...",
-  "priority": 1
-}
-```
+- **Name** — a label for this provider
+- **Base URL** — the OpenAI-compatible endpoint (e.g. `https://api.openai.com/v1`)
+- **API Key** — your key for this provider
+- **Priority** — lower = preferred when multiple providers are available
 
-### Quota Tracking
+### Creating a Combo
 
-KyoRouter automatically tracks quota for supported providers:
+A **combo** is a named route that groups providers. Your tools send requests to the combo name, and KyoRouter routes internally.
 
-- **Supported:** OpenAI, Anthropic, Gemini, Dahl, and more
-- **Storage:** SQLite database with 7-day retention
-- **Auto-refresh:** Smart polling (only active providers)
-
----
-
-## 📊 Dashboard Overview
-
-### Custom Tokens Page
-- Real-time quota visualization
-- Progress bars with color coding (green/yellow/red)
-- Batch refresh for efficient updates
-- Persistent cache across sessions
-
-### Usage Analytics
-- Daily/monthly token consumption
-- Cost estimation (when available)
-- Provider comparison charts
-- Request logs with filtering
-
----
-
-## 🔧 Advanced Features
-
-### Smart Auto-Refresh
-Only refreshes providers accessed within the last 10 minutes — saves resources and respects rate limits.
-
-### Batch State Updates
-Handles 1000+ keys smoothly by batching UI updates (50 keys per batch) — no more UI jitter.
-
-### Dahl Provider Support
-Automatic limit inference for providers that only return remaining tokens.
-
-### SQLite Persistence
-Quota data survives server restarts. 7-day automatic cleanup keeps database lean.
-
-### Prompt Injection (per Combo / per Model)
-
-Inject custom system prompts at three levels, all additive — nothing replaces your global Token Saver skill prompt:
-
-1. **Per-model prompt** — most specific; applies when a request routes to that model.
-2. **Per-combo prompt** — fallback for combo members that have no prompt of their own.
-3. **Global Token Saver prompt** — always applies, stacked underneath the above.
-
-**Priority:** `per-model` → `per-combo` → `global`.
-
-- Configure in **Dashboard → Prompt Injection** (sidebar menu).
-- **Per Combo** tab: pick a combo, write its prompt, toggle enabled. Override any member’s prompt individually.
-- **Per Model** tab: add models from the same selector used on the Combo page, then set/disable each prompt. Models persist even when disabled; remove them with the ✕ button.
-- **Templates**: click **Templates** beside any prompt editor — pick a built-in prompt or save your current text as a reusable custom template. Your templates persist and appear under *Your templates*.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting PRs.
-
-### Development Setup
+Go to **Dashboard → Combos → New Combo**, pick providers, set priority order, and save. Use the combo name as the model in any OpenAI-compatible request:
 
 ```bash
-git clone https://github.com/Ritski04/kyorouter.git
-cd kyorouter/cli
-npm install
-npm run dev
+curl http://localhost:20128/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_KYOROUTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "my-combo", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
-### Project Structure
+### Prompt Injection
+
+Inject system prompts at three levels — all additive, nothing overrides your global Token Saver:
+
+| Level | Priority | Where to configure |
+|-------|----------|--------------------|
+| Per-model | Highest | Dashboard → Prompt Injection → Per Model tab |
+| Per-combo | Fallback | Dashboard → Prompt Injection → Per Combo tab |
+| Global (Token Saver) | Always applied | Dashboard → Settings |
+
+**Per Combo tab:** pick a combo, write the prompt, toggle enabled.
+
+**Per Model tab:** add models using the same picker as the Combo page. Prompts persist even when toggled off — remove a model entry with the ✕ button.
+
+**Templates:** click **Templates** next to any editor to pick a built-in prompt or save your own as a reusable template.
+
+---
+
+## 📊 Dashboard Pages
+
+| Page | What it shows |
+|------|---------------|
+| **Providers** | All configured providers, quota bars, refresh controls |
+| **Combos** | Named routes, provider priority order, model aliases |
+| **Custom Tokens** | Real-time quota per key, batch refresh, 5-min cache |
+| **Prompt Injection** | Per-combo and per-model system prompt editor |
+| **CLI Tools** | Connect/disconnect coding tools, view current config |
+| **Logs** | Live request log with model, provider, token count |
+
+---
+
+## 🗂️ Project Structure
 
 ```
 kyorouter/
-├── cli/                    # CLI package
-│   ├── app/               # Next.js dashboard
-│   └── src/               # CLI source code
+├── cli/
+│   ├── app/                # Next.js dashboard (built output)
+│   ├── src/cli/
+│   │   ├── commands/       # connect, show, update, install, xai
+│   │   └── menus/          # Terminal UI menus
+│   └── cli.js              # CLI entry point
 ├── src/
-│   ├── app/               # Next.js app router
-│   ├── shared/            # Shared components
-│   └── lib/               # Core libraries
-└── custom-server.js       # HTTP proxy server
+│   ├── app/                # Next.js app router (API routes + pages)
+│   ├── shared/             # Shared components and constants
+│   └── lib/                # Core libraries (db, auth, quota, etc.)
+├── open-sse/               # Streaming proxy & provider executors
+└── custom-server.js        # HTTP gateway entry point
 ```
 
 ---
 
-## 📝 License
+## 🧑‍💻 Development
 
-MIT License - see [LICENSE](LICENSE) file for details.
+```bash
+git clone https://github.com/Ritski04/kyorouter.git
+cd kyorouter
+
+# install all deps
+npm install
+cd cli && npm install && cd ..
+
+# run dev server (dashboard + gateway)
+npm run dev
+```
+
+Dashboard at `http://localhost:3000`, gateway at `http://localhost:20127` in dev mode.
+
+To test CLI changes without reinstalling:
+
+```bash
+node cli/cli.js <command>
+```
+
+---
+
+## 📋 Requirements
+
+- Node.js >= 18
+- npm
+- ~200MB free disk space (for build output)
 
 ---
 
@@ -270,35 +225,13 @@ Forked from [9router](https://github.com/decolua/9router) by decolua.
 
 KyoRouter adds:
 - Persistent SQLite quota cache
-- Smart auto-refresh system
-- Enhanced UI with batch updates
-- Dahl provider integration
-- Deep blue aesthetic redesign
+- Smart auto-refresh (active providers only)
 - Per-combo / per-model prompt injection with reusable templates
+- `kyorouter update` and `kyorouter install` CLI commands
+- Deep blue/purple dashboard aesthetic
 
 ---
 
-## 📧 Support
+## 📝 License
 
-- **Issues:** [GitHub Issues](https://github.com/Ritski04/kyorouter/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/Ritski04/kyorouter/discussions)
-
----
-
-## 🗺️ Roadmap
-
-### Version 0.2.0 (Coming Soon)
-- [ ] Docker one-click deployment
-- [ ] Webhook notifications (quota alerts)
-- [ ] Provider health monitoring
-- [ ] Backup/restore configuration
-
-### Version 0.3.0
-- [ ] Multi-user support
-- [ ] API rate limiting
-- [ ] Advanced analytics dashboard
-- [ ] Custom provider plugins
-
----
-
-**Built with ❤️ for developers who need control over their AI infrastructure.**
+MIT — see [LICENSE](LICENSE).
